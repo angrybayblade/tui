@@ -19,6 +19,8 @@ class Container:
 
 class Text(Widget):
     stateful = False
+    pre_text = ''
+    post_text = ''
     def __init__(self,parent:Container,value:str,name:str="Text",geometry:dict={}):
         self.value = value
         self.name = name
@@ -28,136 +30,136 @@ class Text(Widget):
 
     @property
     def height(self,):
-        return int(self.geometry.height * self.parent.height) - 2
+        return int(
+            (self.geometry.height * self.parent.height) -
+            self.parent.padding
+        )
 
     @property
     def width(self,):
-        return int(self.geometry.width * self.parent.width) - 2
-
-    @property
-    def upper_border(self, ):
-        return (
-            f"{Blocks.top_left}{Blocks.medium_center}"
-            f" {self.name} "
-            f"{Blocks.medium_center*(self.width - len(self.name) - 3)}"
-            f"{Blocks.top_right}"
+        return int(
+            (self.geometry.width * self.parent.width) -
+            self.parent.padding
         )
 
     @property
-    def lower_border(self,):
+    def line_hollow(self,):
         return (
-            f"{Blocks.bottom_left}"
-            f"{Blocks.medium_center*self.width}"
-            f"{Blocks.bottom_right}"
+            self.pre_text + 
+            ((self.width)*' ') +
+            self.post_text +
+            '\n'
         )
 
-    def add_update_handler(self,func):
-        pass
-
-    def update_handler(self,*args,**kwargs):
-        pass
-
-    def hollow_line(self,):
-        return (
-            f"{Blocks.medium_left}"
-            f"{' ' * (self.width)}"
-            f"{Blocks.medium_right}\n"
-        )
-
-    def center_line(self,line):
-        whitespace = self.width - len(line)
+    @property
+    def line_center(self,):
+        whitespace = self.width - len(self.value)
         left = whitespace // 2
         right = whitespace - left
-
         return (
-            f"{Blocks.medium_right}"
-            f"{' '*left}"
-            f"{self.value}"
-            f"{' '*right}"
-            f"{Blocks.medium_right}"
+            self.pre_text +
+            ( ' '*left ) +
+            ( self.value ) +
+            ( ' '*right) +
+            self.post_text +
+            '\n'
         )
 
     def render(self,):
-        whitespace = self.height - 1
-        top = whitespace // 2
-        bottom = whitespace - top
-        hollow = self.hollow_line()
-
+        hollow = self.line_hollow
+        whitespace = self.height 
+        left = whitespace // 2
+        right = whitespace - left
         return (
-            f"{self.upper_border}\n"
-            f"{hollow*top}"
-            f"{self.center_line(self.value)}\n"
-            f"{hollow*bottom}"
-            f"{self.lower_border}\n"
+            (hollow*left)+
+            self.line_center +
+            (hollow*right)
         )
 
-class List:
-    value = []
-    update_handler = None
+class TextBordered(Widget):
     stateful = False
+    pre_text = ''
+    post_text = ''
     
-    def __init__(self,geometry:dict,parent=None,name='List'):
+    def __init__(self,parent:Container,value:str,name:str="Text",geometry:dict={}):
+        self.value = value
+        self.name = name
         self.geometry = Geometry(**geometry)
         self.parent = parent
+        self.padding = 2
         self.parent.add(self)
-        self.name = name
 
     @property
-    def upper_block(self,):
-        return (
-            f"{Blocks.top_left}"
-            f"{Blocks.medium_center*2}"
-            f" {self.name} "
-            f"{Blocks.medium_center*Terminal.cols_padded(padding=(6+len(self.name)))}"
-            f"{Blocks.top_right}"
-        ) 
-
-    @property
-    def lower_block(self,)->str:
-        return (
-            f"{Blocks.bottom_left}"
-            f"{Blocks.medium_low*Terminal.cols_padded(padding=2)}"
-            f"{Blocks.bottom_right}"
+    def height(self,):
+        return int(
+            (self.geometry.height * self.parent.height) -
+            self.parent.padding
         )
 
     @property
-    def hollow_line(self)->str:
-        return f"{Blocks.medium_left}{' '*Terminal.cols_padded(padding=2)}{Blocks.medium_right}"
-
-    def center_line(self,line:str)->str:
-        white_space = terminal.cols_padded(2) - len(line)
-        left = white_space // 2
-        right = white_space - left
-        return f"{Blocks.medium_left}{' '*left}{line}{' '*right}{Blocks.medium_right}"
-
-    def left_line(self,line:str)->str:
-        white_space = terminal.cols_padded(2) - len(line)
-        left = white_space // 2
-        right = white_space - left
-        return f"{Blocks.medium_left}{' '*left}{line}{' '*right}{Blocks.medium_right}"
-
-    def right_line(self,line:str)->str:
-        white_space = terminal.cols_padded(2) - len(line)
-        left = white_space // 2
-        right = white_space - left
-        return f"{Blocks.medium_left}{' '*left}{line}{' '*right}{Blocks.medium_right}"
-
-    def render(self,):
-        height = int( 
-            self.parent.geometry.height * 
-            self.geometry.height * 
-            Terminal.rows_padded(padding=4) 
+    def width(self,):
+        return int(
+            (self.geometry.width * self.parent.width) -
+            self.parent.padding + len(self.pre_text) + len(self.post_text)
         )
-        content_height = len(self.value)
 
-        white_space = height - content_height
-        up = white_space // 2
-        down = white_space - up
-
+    @property
+    def border_top(self,):
         return (
-            f"{self.upper_block}"+
-            '\n'.join([self.hollow_line]*up) +
-            '\n'.join([f"{self.center_line(value)}" for value in self._value]) +
-            '\n'.join([self.hollow_line]*down) +
-            f"{self.lower_block}"
-        ) 
+            self.pre_text +
+            Blocks.top_left +
+            ( (self.width - 2) * Blocks.medium_center) +
+            Blocks.top_right +
+            self.post_text +
+            '\n'
+        )
+
+    @property
+    def border_bottom(self,):
+        return (
+            self.pre_text +
+            Blocks.bottom_left +
+            ( (self.width - 2) * Blocks.medium_center) +
+            Blocks.bottom_right +
+            self.post_text 
+        )
+
+    @property
+    def line_center(self,):
+        whitespace = self.width - len(self.value) - 2
+        left = whitespace // 2
+        right = whitespace - left
+        return (
+            self.pre_text +
+            Blocks.medium_right +
+            ( ' '*left )+ 
+            self.value +
+            ( ' '*right )+
+            Blocks.medium_left +
+            self.post_text +
+            '\n'
+        )
+
+    @property
+    def line_hollow(self,):
+        return (
+            self.pre_text +
+            Blocks.medium_right +
+            (' '*(self.width-2)) +
+            Blocks.medium_left +
+            self.post_text +
+            '\n'
+        )
+
+    def render(self,)->str:
+        whitespace = self.height - 2
+        top = whitespace // 2
+        bottom = whitespace - top
+        hollow = self.line_hollow
+        return (
+            self.border_top +
+            (hollow*top) +
+            self.line_center +
+            (hollow*bottom) +
+            self.border_bottom
+        )

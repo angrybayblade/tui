@@ -38,6 +38,7 @@ class Terminal:
 class Geometry:
     height = None
     width = None
+    border = False
     def __init__(self,**kwargs):
         for key,value in kwargs.items():
             self.__dict__[key] = value

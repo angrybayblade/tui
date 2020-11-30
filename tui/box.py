@@ -1,9 +1,17 @@
+from concurrent.futures import ThreadPoolExecutor
 from .__main__ import Geometry,Terminal,Blocks
 
 terminal = Terminal()
 
+
+def render(obj):
+    return getattr(obj,'render')()
+
 class HBox(object):
     stateful = False
+    pre_text = ''
+    post_text = ''
+    padding = 0
     def __init__(self,parent,geometry:dict={'height':1.,'width':1.},widgets:list=[],name:str='HBox'):
         self.widgets = widgets
         self.geometry = Geometry(**geometry)
@@ -15,73 +23,199 @@ class HBox(object):
         self.widgets.append(widget)
 
     @property
-    def height(self,)->int:
-        return int(self.parent.height * self.geometry.height) - 1
-
-    @property
-    def width(self,)->int:
-        return int(self.parent.width * self.geometry.width)
-
-    @property
-    def border_top(self,)->str:
-        return (
-            f"{Blocks.top_left}{Blocks.medium_center}"
-            f" {self.name} "
-            f"{Blocks.medium_center*(self.width - len(self.name) - 3)}"
-            f"{Blocks.top_right}"
+    def height(self,):
+        return int(
+            (self.geometry.height * self.parent.height ) -
+            self.parent.padding
         )
 
     @property
-    def border_bottom(self,)->str:
-        return (
-            f"{Blocks.bottom_left}"
-            f"{Blocks.medium_center*(self.width)}"
-            f"{Blocks.bottom_right}"
-        )
-
-    def center_line(self,line:str)->str:
-        line = f" ".join(line)
-        whitespace = self.width - len(line)
-        left = whitespace // 2
-        right = whitespace - left
-        return (
-            Blocks.medium_right +
-            " " * left +
-            line +
-            " " * right +
-            Blocks.medium_right 
-        )
-
-    def hollow_line(self,):
-        return (
-            f"{Blocks.medium_left}"
-            f"{ ' ' * self.width}"
-            f"{Blocks.medium_right}"
+    def width(self,):
+        return int(
+            (self.geometry.width * self.parent.width ) -
+            self.parent.padding
         )
 
     def render(self,):
-        rows = [widget.render().split("\n") for widget in self.widgets]
-        rows = "\n".join([self.center_line(row) for row in zip(*rows)])
+        with ThreadPoolExecutor(max_workers=(len(self.widgets))) as executer:
+            rows = executer.map(render,self.widgets)
+            rows = zip(*[ row.split('\n') for row in rows ])
+            rows = "\n".join([ " ".join(row) for row in rows ])
+
+        return rows
+
+class HBoxBordered(object):
+    stateful = False
+    pre_text = ''
+    post_text = ''
+    padding = 2
+    def __init__(self,parent,geometry:dict={'height':1.,'width':1.},widgets:list=[],name:str='HBox'):
+        self.widgets = widgets
+        self.geometry = Geometry(**geometry)
+        self.parent = parent
+        self.name = name
+        self.parent.add(self)
+
+    def add(self,widget):
+        if len(self.widgets) == 0:
+            widget.pre_text = Blocks.medium_right
+        else:
+            self.widgets[-1].post_text = ''
+
+        widget.post_text = Blocks.medium_left
+        self.widgets.append(widget)
+
+    @property
+    def height(self,):
+        return int(
+            (self.geometry.height * self.parent.height ) -
+            self.parent.padding
+        )
+    
+    @property
+    def width(self,):
+        return int(
+            (self.geometry.width * self.parent.width ) -
+            self.parent.padding
+        )
+
+    @property
+    def border_top(self,):
+        return (
+            self.pre_text +
+            Blocks.top_left  +
+            Blocks.medium_center +
+            f" {self.name} " +
+            ( Blocks.medium_center * (self.width - len(self.name) - 5) ) + 
+            Blocks.top_right +
+            self.post_text
+        )
+    
+    @property
+    def border_bottom(self,):
+        return (
+            self.pre_text +
+            Blocks.bottom_left  +
+            ((self.width - 2) * Blocks.medium_center) +
+            Blocks.bottom_right +
+            self.post_text
+        )
+
+    def render(self,):
+        with ThreadPoolExecutor(max_workers=(len(self.widgets))) as executer:
+            rows = executer.map(render,self.widgets)
+            rows = zip(*[ row.split('\n') for row in rows ])
+            rows = "\n".join([ " ".join(row) for row in rows ])
 
         return (
-            f"{self.border_top}\n" 
-            f"{rows}\n"
-            f"{self.border_bottom}"
+            self.border_top +
+            rows +
+            self.border_bottom
         )
 
 class VBox(object):
     stateful = False
-    def __init__(self,parent,geometry:dict={'height':1.,'width':1.},widgets:list=[]):
+    pre_text = ''
+    post_text = ''
+    def __init__(self,parent,geometry:dict={'height':1.,'width':1.},widgets:list=[],name:str='HBox'):
         self.widgets = widgets
         self.geometry = Geometry(**geometry)
-        parent.add(self)
+        self.parent = parent
+        self.name = name
+        self.padding = 0
+        self.parent.add(self)
 
     def add(self,widget):
         self.widgets.append(widget)
 
-    def render(self,):
-        return "\n".join([widget.render() for widget in self.widgets])
-        
+    @property
+    def height(self,):
+        return int(
+            (self.geometry.height * self.parent.height) -
+            self.parent.padding -
+            2
+        )
+
+    @property
+    def width(self,):
+        return int(
+            (self.geometry.width * self.parent.width) -
+            self.parent.padding
+        )
+
+    def render(self,)->str:
+        with ThreadPoolExecutor(max_workers=(len(self.widgets))) as executer:
+            rows = executer.map(render,self.widgets)
+            rows = ''.join(rows)
+
+        return rows
+
+class VBoxBordered(object):
+    stateful = False
+    pre_text = ''
+    post_text = ''
+    def __init__(self,parent,geometry:dict={'height':1.,'width':1.},widgets:list=[],name:str='HBox'):
+        self.widgets = widgets
+        self.geometry = Geometry(**geometry)
+        self.parent = parent
+        self.name = name
+        self.padding = 2
+        self.parent.add(self)
+
+    def add(self,widget):
+        widget.pre_text = Blocks.medium_right
+        widget.post_text = Blocks.medium_left
+        self.widgets.append(widget)
+
+    
+    @property
+    def height(self,):
+        return (
+            int(self.geometry.height * self.parent.height) -
+            self.parent.padding
+        )
+    
+    @property
+    def width(self,):
+        return (
+            int(self.geometry.width * self.parent.width) - 
+            self.parent.padding
+        )
+
+    @property
+    def border_top(self,)->str:
+        return (
+            self.pre_text + 
+            Blocks.top_left +
+            Blocks.medium_center +
+            f" {self.name} " + 
+            ((self.width - len(self.name)-5) * Blocks.medium_center) +
+            Blocks.top_right +
+            self.post_text
+        )
+
+    @property
+    def border_bottom(self,):
+        return (
+            self.pre_text +
+            Blocks.bottom_left +
+            ((self.width-2) * Blocks.medium_center) +
+            Blocks.bottom_right +
+            self.post_text
+        )
+
+    def render(self,)->str:
+        with ThreadPoolExecutor(max_workers=(len(self.widgets))) as executer:
+            rows = executer.map(render,self.widgets)
+            rows = f''.join(rows)
+
+        return (
+            self.border_top +
+            rows +
+            '\n'+
+            self.border_bottom
+        )
+
 class Grid(object):
     def __init__(self):
         pass
