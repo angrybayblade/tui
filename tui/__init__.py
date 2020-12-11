@@ -1,1 +1,1 @@
-from .__main__ import Geometry,Terminal,Blocks
+from .__main__ import Terminal,Blocks
