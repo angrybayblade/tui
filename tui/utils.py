@@ -1,5 +1,3 @@
-from ._imports import os
-
 class Blocks:
     whitespace = ''
     tabspace = '\t'
