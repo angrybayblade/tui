@@ -49,6 +49,8 @@ class Text(object):
     # cached
     _height = 0
     _width = 0
+    _xmin = 0
+    _ymin = 0
     _screen = np.array([])
     
     def __init__(
@@ -63,6 +65,7 @@ class Text(object):
 
         self.parent.add(self)
         self.generate_cache()
+        self.parent.update_cursor(self._height,self._width)
     
     @property
     def height(self,):
@@ -73,29 +76,45 @@ class Text(object):
         return self._width
 
     def generate_cache(self,):
-        self._height = int(self.style.height * self.parent.height)
-        self._width = int(self.style.width * self.parent.width)
+        self._height = int(self.style.height * self.parent.height) 
+        self._width = int(self.style.width * self.parent.width) 
 
-        self._screen[:,[0,-1]] = Blocks.thin.vr
-        self._screen[[0,-1],:] = Blocks.thin.hr
+        self._xmax = self._xmin + self._width 
+        self._ymax = self._ymin + self._height 
 
-        self._screen[0,0] = Blocks.thin.top_left
-        self._screen[0,-1] = Blocks.thin.top_right
-        self._screen[-1,0] = Blocks.thin.bottom_left
-        self._screen[-1,-1] = Blocks.thin.bottom_right
+        self._content = np.zeros(shape=(self._height,self._width),dtype=str)
+        self._content[:,:] = ' '
+        self._content[:,[0,-1]] = Blocks.thin.vr
+        self._content[[0,-1],:] = Blocks.thin.hr
 
-        content = np.array(list(self.state))
-    
-        t = (self._height // 2)
-        l = (self._width // 2) - len(content) // 2 
+        self._content[0,0] = Blocks.thin.top_left
+        self._content[0,-1] = Blocks.thin.top_right
+        self._content[-1,0] = Blocks.thin.bottom_left
+        self._content[-1,-1] = Blocks.thin.bottom_right
 
-        self._screen[t:t+1,l:l+len(content)] = content
+        self.render()
 
     def update_state(self,):
-        pass
+        i = np.random.randint(0,10)
+        while True:
+            self.state = f'Count {i}'
+            time.sleep(0.3)
+            self.render()
+            i += 1
 
     def render(self,):
-        pass
+        whitespace = self._width - len(self.state)
+        left = whitespace // 2
+        right = whitespace - left
+
+        whitespace  = self._height - 1
+        top = whitespace // 2
+
+        self._content[top:top+1,left:left+len(self.state)] = np.array(list(self.state))
+        self._content[top:top+1,1:left] = ' '
+        self._content[top:top+1,left+len(self.state):-1] = ' '
+        
+        self._screen[self._ymin:self._ymax,self._xmin:self._xmax] = self._content[:,:]
 
 class Screen(object):
     children = []
@@ -104,6 +123,11 @@ class Screen(object):
     _terminal = Terminal()
     _height = 0
     _width = 0
+    _xmin = 0
+    _ymin = 0
+
+    _cursor_x = 0
+    _cursor_y = 0
 
     def __init__(self,
             style:Style = _default_style
@@ -111,8 +135,6 @@ class Screen(object):
         
         self.style = style
         self.generate_cache()
-
-        os.system("cls||clear")
 
     def generate_cache(self,):
         self._height = int(self.style.height * self._terminal.height)
@@ -129,9 +151,14 @@ class Screen(object):
     def width(self,):
         return self._width
 
-    def add(self,child):
+    def add(self,child:Text):
         child._screen = self._screen
+        child._xmin = self._cursor_x
+        child._ymin = self._cursor_y
         self.children.append(child)
+
+    def update_cursor(self,ch,cw):
+        self._cursor_y += ch
 
     def __str__(self,):
         pass
@@ -141,50 +168,28 @@ class Screen(object):
 
     def render(self,):
         while True:
-            sys.stdout.write(u"\u001b[{}D".format(self._width)) 
-            sys.stdout.write(u"\u001b[{}A".format(self._height))         
-            sys.stdout.write('\n'.join(np.apply_along_axis(lambda x:''.join(x),0,self._screen.T)))
+            sys.stdout.write(u"\u001b[0;0H")         
+            sys.stdout.write('\r\n'.join(np.apply_along_axis(lambda x:''.join(x),0,self._screen.T)))
             sys.stdout.flush()
-            time.sleep(1)
+            time.sleep(0.3)
 
 def main():
+    os.system("cls||clear")
     screen = Screen(style=Style(height=1.,width=1.))
+    t1 = Text(screen,state='Count will start',style=Style(height=1/4,width=1))
+    t2 = Text(screen,state='Count will start',style=Style(height=1/4,width=1))
+    t2 = Text(screen,state='Count will start',style=Style(height=1/4,width=1))
+    t2 = Text(screen,state='Count will start',style=Style(height=1/4,width=1))
 
-    t1 = Text(screen,state='Count',style=Style(height=1.,width=1.))
+    update_threads = []
+    for child in screen.children:
+        t = Thread(target=child.update_state,)
+        t.start()
+        update_threads.append(t)
 
     screen.render()
+    joined = [t.join() for t in update_threads]
 
 if __name__ == "__main__":
     main()
 
-# os.system('cls||clear')
-# while True:
-#     col,row = os.get_terminal_size()
-#     count = row
-#     text = f'hello world {i}'
-    
-#     w = col - len(text) - 2
-#     l = w // 2
-#     r = w - l
-
-#     h = Blocks.thin.vr + (' '*(col-2)) + Blocks.thin.vr
-    
-#     w = row - 3
-#     t = w // 2
-#     b = w - t
-
-#     screen = [
-#         Blocks.thin.top_left + Blocks.thin.hr*(col-2) + Blocks.thin.top_right,
-#         *([h]*t),
-#         Blocks.thin.vr +' '*l + text + ' '*r + Blocks.thin.vr,
-#         *([h]*b),
-#         Blocks.thin.bottom_left + Blocks.thin.hr*(col-2) + Blocks.thin.bottom_right
-#     ]
-
-#     sys.stdout.write(u"\u001b[{col}D".format(col=col)) 
-#     sys.stdout.write(u"\u001b[{row}A".format(row=row))         
-#     sys.stdout.write('\n'.join(screen))
-#     sys.stdout.flush()
-
-#     i += 1
-#     time.sleep(0.1)
